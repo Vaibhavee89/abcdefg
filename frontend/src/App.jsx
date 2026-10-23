@@ -4,6 +4,19 @@ import Forecast from './pages/Forecast'
 import Accuracy from './pages/Accuracy'
 import './App.css'
 
+const PRESET_CUTOFFS = ['09:00', '09:30']
+const VALID_TABS = ['home', 'forecast', 'accuracy']
+const DEFAULT_DATE = '2026-01-14'
+const clampDate = (d) => (d < '2026-01-01' ? '2026-01-01' : d > '2026-01-31' ? '2026-01-31' : d)
+
+function readUrlState() {
+  const p = new URLSearchParams(window.location.search)
+  const tab = VALID_TABS.includes(p.get('tab')) ? p.get('tab') : 'home'
+  const cutoff = /^([01]\d|2[0-3]):[0-5]\d$/.test(p.get('cutoff') || '') ? p.get('cutoff') : '09:00'
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(p.get('date') || '') ? clampDate(p.get('date')) : DEFAULT_DATE
+  return { tab, cutoff, date }
+}
+
 function useUtcClock() {
   const [t, setT] = useState(() => new Date())
   useEffect(() => {
@@ -14,14 +27,25 @@ function useUtcClock() {
 }
 
 export default function App() {
-  const [tab, setTab] = useState('home')
-  const [cutoff, setCutoff] = useState('09:00')
+  const init = useState(readUrlState)[0]
+  const [tab, setTab] = useState(init.tab)
+  const [cutoff, setCutoff] = useState(init.cutoff)
+  const [date, setDate] = useState(init.date)
+  const [advancedCutoff, setAdvancedCutoff] = useState(!PRESET_CUTOFFS.includes(init.cutoff))
   const [theme, setTheme] = useState('light')
   const clock = useUtcClock()
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
   }, [theme])
+
+  useEffect(() => {
+    const p = new URLSearchParams()
+    p.set('tab', tab)
+    p.set('cutoff', cutoff)
+    p.set('date', date)
+    window.history.replaceState(null, '', `${window.location.pathname}?${p.toString()}`)
+  }, [tab, cutoff, date])
 
   return (
     <div className="app">
@@ -37,18 +61,31 @@ export default function App() {
         </div>
         <div className="topbar-right">
           <span className="pill"><span className="live-dot" /> UTC {clock}</span>
-          <span className="pill">Cutoff:
-            <select className="cutoff-select" value={cutoff} onChange={(e) => setCutoff(e.target.value)}>
-              {['07:00', '09:00', '09:30', '11:00'].map((c) => <option key={c} value={c}>{c} UTC</option>)}
-            </select>
-          </span>
+          <div className="cutoff-chips">
+            {PRESET_CUTOFFS.map((c) => (
+              <button
+                key={c}
+                className={!advancedCutoff && cutoff === c ? 'chip-btn on' : 'chip-btn'}
+                onClick={() => { setAdvancedCutoff(false); setCutoff(c) }}
+              >{c}</button>
+            ))}
+            <button className={advancedCutoff ? 'chip-btn on' : 'chip-btn'} onClick={() => setAdvancedCutoff(true)}>Advanced</button>
+            {advancedCutoff && (
+              <input
+                type="time"
+                className="cutoff-custom"
+                value={cutoff}
+                onChange={(e) => e.target.value && setCutoff(e.target.value)}
+              />
+            )}
+          </div>
           <button className="theme-toggle" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>
             {theme === 'light' ? '◐ Light' : '◑ Dark'}
           </button>
         </div>
       </div>
       {tab === 'home' && <Landing cutoff={cutoff} onNavigate={setTab} />}
-      {tab === 'forecast' && <Forecast cutoff={cutoff} />}
+      {tab === 'forecast' && <Forecast cutoff={cutoff} date={date} setDate={(d) => setDate(clampDate(d))} />}
       {tab === 'accuracy' && <Accuracy cutoff={cutoff} />}
     </div>
   )

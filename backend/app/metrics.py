@@ -11,6 +11,8 @@ def _agg(g):
         p50=("error", lambda s: s.quantile(0.50)),
         p90=("error", lambda s: s.quantile(0.90)),
         p95=("error", lambda s: s.quantile(0.95)),
+        mean_actual=("actual", "mean"),
+        mean_forecast=("forecast", "mean"),
     )
     out["rmse"] = np.sqrt(out.pop("mse"))
     return out

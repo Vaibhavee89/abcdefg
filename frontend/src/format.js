@@ -1,0 +1,5 @@
+export const mw = (v) => (v == null || Number.isNaN(v) ? '–' : Math.round(v).toLocaleString())
+export const signedMw = (v) => (v == null || Number.isNaN(v) ? '–' : (v >= 0 ? '+' : '') + Math.round(v).toLocaleString())
+export const gw = (v) => (v == null || Number.isNaN(v) ? '–' : (v / 1000).toFixed(2))
+export const signedGw = (v) => (v == null || Number.isNaN(v) ? '–' : (v >= 0 ? '+' : '') + (v / 1000).toFixed(2))
+export const errorDirection = (v) => (v == null ? '' : v >= 0 ? 'Forecast too high (shortfall risk)' : 'Forecast too low (surplus)')

@@ -1,38 +1,47 @@
-import { useEffect, useState } from 'react'
 import { ResponsiveContainer, ComposedChart, BarChart, LineChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine, Cell } from 'recharts'
 import { get } from '../api'
+import { useApi } from '../useApi'
+import { mw, gw, signedGw } from '../format'
+import { GLOSSARY } from '../glossary'
+import InfoTip from '../components/InfoTip'
+import HowToRead from '../components/HowToRead'
+import { SkeletonCard, RetryBanner } from '../components/Skeleton'
 
-const mw = (v) => (v == null ? '–' : Math.round(v).toLocaleString() + ' MW')
-const signed = (v) => (v == null ? '–' : (v >= 0 ? '+' : '') + Math.round(v).toLocaleString())
-
-function Kpi({ eyebrow, value, unit, sub, variant, chip }) {
+function Kpi({ eyebrow, info, value, unit, sub, variant, chip, subtitle }) {
   return (
     <div className={`kpi${variant ? ' ' + variant : ''}`}>
-      <div className="kpi-head"><span className="kpi-eyebrow">{eyebrow}</span>{chip}</div>
-      <div className={`kpi-value${variant === 'emph' ? '' : ''}`}>{value} <small>{unit}</small></div>
+      <div className="kpi-head"><span className="kpi-eyebrow">{eyebrow}{info && <InfoTip text={info} />}</span>{chip}</div>
+      {subtitle && <div className="kpi-subtitle">{subtitle}</div>}
+      <div className="kpi-value">{value} <small>{unit}</small></div>
       <div className="kpi-sub">{sub}</div>
     </div>
   )
 }
 
 export default function Accuracy({ cutoff }) {
-  const [d, setD] = useState(null)
-  const [err, setErr] = useState(null)
-
-  useEffect(() => {
-    setErr(null)
-    Promise.all([
+  const { data: d, loading, error, retry } = useApi(
+    () => Promise.all([
       get('/api/metrics/summary', { cutoff }),
       get('/api/metrics/by-hour', { cutoff }),
       get('/api/metrics/by-horizon'),
       get('/api/metrics/histogram', { cutoff }),
       get('/api/metrics/by-day', { cutoff }),
-    ]).then(([summary, byHour, byHorizon, hist, byDay]) => setD({ summary, byHour, byHorizon, hist, byDay }))
-      .catch((e) => setErr(e.message))
-  }, [cutoff])
+    ]).then(([summary, byHour, byHorizon, hist, byDay]) => ({ summary, byHour, byHorizon, hist, byDay })),
+    [cutoff]
+  )
 
-  if (err) return <p className="error">{err}</p>
-  if (!d) return <section className="page"><p className="note">Loading…</p></section>
+  if (!d && loading) {
+    return (
+      <section className="page">
+        <SkeletonCard lines={1} />
+        <div className="kpi-row"><SkeletonCard lines={1} /><SkeletonCard lines={1} /><SkeletonCard lines={1} /><SkeletonCard lines={1} /><SkeletonCard lines={1} /></div>
+        <div className="grid-2"><SkeletonCard lines={5} /><SkeletonCard lines={5} /><SkeletonCard lines={5} /><SkeletonCard lines={5} /></div>
+      </section>
+    )
+  }
+  if (!d && error) {
+    return <section className="page"><RetryBanner message={error} onRetry={retry} /></section>
+  }
 
   const s = d.summary
   const histData = d.hist.counts.map((c, i) => ({ bin: Math.round((d.hist.edges[i] + d.hist.edges[i + 1]) / 2), count: c }))
@@ -49,36 +58,43 @@ export default function Accuracy({ cutoff }) {
         <div className="run-meta">Sample: <b>{s.n} settlement periods</b> (Jan 2026 decisions)</div>
       </div>
 
+      <HowToRead>
+        <p>This page summarises how accurate the day-ahead forecast has been across the whole of January 2026, at your chosen decision cutoff.</p>
+        <p>Hover the ⓘ next to any metric label for a plain-English explanation. <b>Bias</b> and <b>MAE</b>/<b>RMSE</b> describe typical error size; <b>P90</b>/<b>P95</b> are buffers you could add to a forecast to cover most or nearly all of the historical over-forecast risk.</p>
+      </HowToRead>
+
       <div className="banner">
-        <span><b>Sign Convention:</b> Error = Forecast − Actual. Positive (+MW) = over-forecast. Decision cutoff active: {cutoff} UTC.</span>
-        <span className="tag">+MW OVER-FORECAST (SHORTFALL RISK) · −MW UNDER-FORECAST (SPILL/SURPLUS)</span>
+        <span><b>Sign Convention:</b> Error = Forecast − Actual. Positive (+MW) means <b>forecast too high (shortfall risk)</b>. Decision cutoff active: {cutoff} UTC.</span>
+        <span className="tag">+MW FORECAST TOO HIGH (SHORTFALL) · −MW FORECAST TOO LOW (SURPLUS)</span>
       </div>
+
+      {error && <RetryBanner message={error} onRetry={retry} />}
 
       <div className="callout">
         <div className="callout-text">
-          <b>LIVE DECISION INSIGHT</b> · At the {cutoff} UTC cutoff, the forecast ran <b>{signed(s.bias)} MW</b> ({s.bias_pct_of_mean_actual.toFixed(1)}% of mean wind) above metered wind on average.
-          By construction, around 90% of hourly over-forecasts stayed within the P90 buffer of <b>{mw(s.p90)}</b>.
+          <b>LIVE DECISION INSIGHT</b> · At the {cutoff} UTC cutoff, the forecast ran <b>{signedGw(s.bias)} GW</b> ({s.bias_pct_of_mean_actual.toFixed(1)}% of mean wind) above metered wind on average.
+          By construction, around 90% of hourly over-forecasts stayed within the suggested buffer of <b>{gw(s.p90)} GW</b>.
         </div>
         <div className="callout-aside">
           <div className="label">Recommended Hedge</div>
-          <div className="value">{signed(s.p90)} MW</div>
+          <div className="value">{signedGw(s.p90)} GW</div>
           <div className="hint">D-1 Safety Margin (P90)</div>
         </div>
       </div>
 
-      <div className="kpi-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))' }}>
-        <Kpi eyebrow="Bias (Mean Error)" value={signed(s.bias)} unit="MW" sub={`${s.bias_pct_of_mean_actual.toFixed(1)}% of mean wind (systemic)`} chip={<span className="chip risk">SYSTEMIC</span>} />
-        <Kpi eyebrow="MAE" value={mw(s.mae).replace(' MW', '')} unit="MW" sub={`${s.mae_pct_of_mean_actual.toFixed(1)}% of mean actual dispatch`} />
-        <Kpi eyebrow="RMSE" value={mw(s.rmse).replace(' MW', '')} unit="MW" sub="Penalises large outlier swings" />
-        <Kpi eyebrow="P90 Over-Forecast" value={signed(s.p90)} unit="MW" sub="Plan buffer: 90% of over-forecasts fall below this" variant="emph" chip={<span className="chip ok">TARGET BUFFER</span>} />
-        <Kpi eyebrow="P95 Over-Forecast" value={signed(s.p95)} unit="MW" sub="Extreme buffer: 95% of over-forecasts fall below this" variant="emph" chip={<span className="chip ok">EXTREME TAIL</span>} />
+      <div className={`kpi-row${loading ? ' dimmed' : ''}`} style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))' }}>
+        <Kpi eyebrow="Bias (Mean Error)" info={GLOSSARY.bias} value={signedGw(s.bias)} unit="GW" sub={`${s.bias_pct_of_mean_actual.toFixed(1)}% of mean wind · ${mw(s.bias)} MW`} chip={<span className="chip risk">SYSTEMIC</span>} />
+        <Kpi eyebrow="MAE" info={GLOSSARY.mae} value={gw(s.mae)} unit="GW" sub={`${s.mae_pct_of_mean_actual.toFixed(1)}% of mean dispatch · ${mw(s.mae)} MW`} />
+        <Kpi eyebrow="RMSE" info={GLOSSARY.rmse} value={gw(s.rmse)} unit="GW" sub={`Penalises large outliers · ${mw(s.rmse)} MW`} />
+        <Kpi eyebrow="Suggested buffer" subtitle="P90 over-forecast" info={GLOSSARY.p90} value={signedGw(s.p90)} unit="GW" sub={`90% of over-forecasts fall below this · ${mw(s.p90)} MW`} variant="emph" chip={<span className="chip ok">TARGET BUFFER</span>} />
+        <Kpi eyebrow="Defensive buffer" subtitle="P95 over-forecast" info={GLOSSARY.p95} value={signedGw(s.p95)} unit="GW" sub={`95% of over-forecasts fall below this · ${mw(s.p95)} MW`} variant="emph" chip={<span className="chip ok">EXTREME TAIL</span>} />
       </div>
 
-      <div className="grid-2">
+      <div className={`grid-2${loading ? ' dimmed' : ''}`}>
         <div className="card">
           <p className="card-eyebrow">Diurnal Pattern</p>
           <h2 className="card-title">Error by delivery hour (UTC)</h2>
-          <p className="card-sub">Bias bars show average hourly tilt (orange = over-forecast, green = under), with the black line tracking absolute (MAE) spread across 24 settlement intervals.</p>
+          <p className="card-sub">Bias bars show average hourly tilt (orange = forecast too high, green = forecast too low), with the black line tracking <InfoTip text={GLOSSARY.mae} /> MAE spread across 24 settlement intervals.</p>
           <ResponsiveContainer width="100%" height={260}>
             <ComposedChart data={byHourData}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--hairline)" />
@@ -93,7 +109,7 @@ export default function Accuracy({ cutoff }) {
             </ComposedChart>
           </ResponsiveContainer>
           <div className="card-footer">
-            <span>Max hourly tilt: <b>{mw(Math.max(...byHourData.map((r) => r.bias)))}</b></span>
+            <span>Max hourly tilt: <b>{mw(Math.max(...byHourData.map((r) => r.bias)))} MW</b></span>
             <span className="warn">Peak risk hours visible where bars are tallest (orange)</span>
           </div>
         </div>
@@ -101,7 +117,7 @@ export default function Accuracy({ cutoff }) {
         <div className="card">
           <p className="card-eyebrow">Risk Density</p>
           <h2 className="card-title">Error distribution histogram</h2>
-          <p className="card-sub">Frequency of hourly errors across {s.n} observations, with zero-error and P90 reference lines.</p>
+          <p className="card-sub">Frequency of hourly errors across {s.n} observations, with zero-error and <InfoTip text={GLOSSARY.p90} /> P90 reference lines.</p>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={histData}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--hairline)" />
@@ -117,14 +133,14 @@ export default function Accuracy({ cutoff }) {
           </ResponsiveContainer>
           <div className="card-footer">
             <span>0 MW = perfect forecast</span>
-            <span className="warn">P90 ({mw(s.p90)}) marks the shortfall tail</span>
+            <span className="warn">P90 ({mw(s.p90)} MW) marks the shortfall tail</span>
           </div>
         </div>
 
         <div className="card">
           <p className="card-eyebrow">Horizon Degradation</p>
           <h2 className="card-title">Accuracy vs lead time</h2>
-          <p className="card-sub">Error metrics as forecast lead time increases. Buckets with fewer than 1,000 observations are hidden.</p>
+          <p className="card-sub">Error metrics as forecast <InfoTip text={GLOSSARY.horizon} /> lead time increases. Buckets with fewer than 1,000 observations are hidden.</p>
           <ResponsiveContainer width="100%" height={260}>
             <LineChart data={horizon}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--hairline)" />
@@ -160,7 +176,7 @@ export default function Accuracy({ cutoff }) {
         </div>
       </div>
 
-      <div className="card">
+      <div className={`card${loading ? ' dimmed' : ''}`}>
         <div className="card-head">
           <div>
             <p className="card-eyebrow">Model Residual Benchmark</p>
@@ -176,11 +192,11 @@ export default function Accuracy({ cutoff }) {
             <tr>
               <td>Desk Model (Live)</td>
               <td>Elexon WINDFOR day-ahead</td>
-              <td className={s.bias >= 0 ? 'error pos' : 'error neg'}>{signed(s.bias)}</td>
+              <td className={s.bias >= 0 ? 'error pos' : 'error neg'}>{mw(s.bias)}</td>
               <td>{Math.round(s.mae).toLocaleString()}</td>
               <td>{Math.round(s.rmse).toLocaleString()}</td>
-              <td>{signed(s.p90)}</td>
-              <td>{signed(s.p95)}</td>
+              <td>{mw(s.p90)}</td>
+              <td>{mw(s.p95)}</td>
               <td><span className="chip ok">ACTIVE LIVE</span></td>
             </tr>
           </tbody>

@@ -5,3 +5,4 @@ __pycache__/
 frontend/dist/
 .DS_Store
 *.log
+.vercel/

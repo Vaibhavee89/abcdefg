@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ResponsiveContainer, ComposedChart, Area, Line, XAxis, Tooltip } from 'recharts'
 import { get } from '../api'
+import HowToRead from '../components/HowToRead'
 
 const mw = (v) => (v == null ? '–' : Math.round(v).toLocaleString())
 const signed = (v) => (v == null ? '–' : (v >= 0 ? '+' : '') + Math.round(v).toLocaleString())
@@ -81,6 +82,11 @@ export default function Landing({ cutoff, onNavigate }) {
           </ResponsiveContainer>
         </div>
       </div>
+
+      <HowToRead>
+        <p>This site is split into three views. <b>Home</b> (this page) is an overview with a live backtest summary and an illustrative buffer calculator. <b>Forecast</b> shows one day of decision-time forecast vs metered actual in detail. <b>Accuracy</b> shows aggregate error statistics across all of January 2026.</p>
+        <p>All figures are computed live by the FastAPI backend from Elexon BMRS data — nothing is a simulated testimonial or audited claim.</p>
+      </HowToRead>
 
       <div className="section-head">
         <h2 className="card-title" style={{ fontSize: 24 }}>Generic weather forecasts don't pay imbalance fines. Trading desks do.</h2>
