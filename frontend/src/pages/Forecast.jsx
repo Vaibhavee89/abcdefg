@@ -38,12 +38,13 @@ function TooltipCard({ active, payload, label }) {
   )
 }
 
-export default function Forecast({ cutoff, date, setDate }) {
+export default function Forecast({ cutoff, date, setDate, meta }) {
+  const bounds = meta?.coverage?.decisions ?? null
   const { data: bundle, loading, error, retry } = useApi(
     () => Promise.all([
-      get('/api/forecast', { decision_date: date, cutoff }),
-      get('/api/metrics/summary', { cutoff }),
-      get('/api/metrics/by-day', { cutoff }),
+      get('/forecast', { decision_date: date, cutoff }),
+      get('/metrics/summary', { cutoff }),
+      get('/metrics/by-day', { cutoff }),
     ]).then(([f, s, byDay]) => ({ rows: f.rows, sum: s, byDay })),
     [date, cutoff]
   )
@@ -129,7 +130,7 @@ export default function Forecast({ cutoff, date, setDate }) {
         <div className="date-nav">
           <button onClick={() => setDate(addDays(date, -1))} aria-label="Previous day">‹</button>
           <div className="date-field">
-            <input type="date" min="2026-01-01" max="2026-01-31" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} />
+            <input type="date" min={bounds?.first} max={bounds?.last} value={date} onChange={(e) => e.target.value && setDate(e.target.value)} />
             <span className="date-sub">(Day-Ahead Delivery)</span>
           </div>
           <button onClick={() => setDate(addDays(date, 1))} aria-label="Next day">›</button>

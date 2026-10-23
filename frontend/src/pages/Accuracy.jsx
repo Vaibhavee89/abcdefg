@@ -21,11 +21,11 @@ function Kpi({ eyebrow, info, value, unit, sub, variant, chip, subtitle }) {
 export default function Accuracy({ cutoff }) {
   const { data: d, loading, error, retry } = useApi(
     () => Promise.all([
-      get('/api/metrics/summary', { cutoff }),
-      get('/api/metrics/by-hour', { cutoff }),
-      get('/api/metrics/by-horizon'),
-      get('/api/metrics/histogram', { cutoff }),
-      get('/api/metrics/by-day', { cutoff }),
+      get('/metrics/summary', { cutoff }),
+      get('/metrics/by-hour', { cutoff }),
+      get('/metrics/by-horizon'),
+      get('/metrics/histogram', { cutoff }),
+      get('/metrics/by-day', { cutoff }),
     ]).then(([summary, byHour, byHorizon, hist, byDay]) => ({ summary, byHour, byHorizon, hist, byDay })),
     [cutoff]
   )

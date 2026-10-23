@@ -1,1 +1,9 @@
 target-version = "py39"
+
+[lint]
+# UP006/UP035/FA100: these push typing.List/Optional towards PEP 604/585
+# `list[...]` / `X | None` syntax, which needs Python 3.10+ (or a
+# `from __future__ import annotations` workaround) to use bare union syntax.
+# Since target-version is py39, typing.List/Optional stay as explicit,
+# readable code rather than chasing that churn.
+ignore = ["UP006", "UP035", "FA100"]

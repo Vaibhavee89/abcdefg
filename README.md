@@ -99,16 +99,18 @@ No environment variables are required for local development — see [.env.exampl
 
 ## API endpoints
 
+All routes are versioned under `/api/v1`. Every response (success and error) has a Pydantic model, so `/docs` shows real schemas, not generic JSON blobs. Errors always come back as `{"error": {"code": "...", "message": "..."}}` — whether raised manually (e.g. a bad cutoff) or by FastAPI's own request validation (e.g. a query param out of range) — through one shared error-response helper in `main.py`.
+
 | Endpoint | Query params | Returns |
 |---|---|---|
-| `/api/health` | — | liveness check |
-| `/api/meta` | — | dataset date range, default cutoff |
-| `/api/forecast` | `decision_date`, `cutoff` | hourly forecast/actual/error for one delivery day |
-| `/api/metrics/summary` | `cutoff` | bias, MAE, RMSE, percentiles over the full sample |
-| `/api/metrics/by-hour` | `cutoff` | the above, broken down by hour of day |
-| `/api/metrics/by-day` | `cutoff` | the above, broken down by decision date |
-| `/api/metrics/by-horizon` | — | accuracy vs. forecast lead time (6h buckets) |
-| `/api/metrics/histogram` | `cutoff`, `bins` | error distribution histogram |
+| `/api/v1/health` | — | liveness check |
+| `/api/v1/meta` | — | data version and real coverage (decision dates, actuals range, forecast publish/target range) and default cutoff — the frontend reads this instead of hard-coding any date |
+| `/api/v1/forecast` | `decision_date`, `cutoff` | hourly forecast/actual/error for one delivery day |
+| `/api/v1/metrics/summary` | `cutoff` | bias, MAE, RMSE, percentiles over the full sample |
+| `/api/v1/metrics/by-hour` | `cutoff` | the above, broken down by hour of day |
+| `/api/v1/metrics/by-day` | `cutoff` | the above, broken down by decision date |
+| `/api/v1/metrics/by-horizon` | — | accuracy vs. forecast lead time (6h buckets) |
+| `/api/v1/metrics/histogram` | `cutoff`, `bins` | error distribution histogram |
 
 ## Design decisions and trade-offs
 
@@ -128,6 +130,8 @@ The test suite covers:
 - Metrics: bias, MAE and RMSE on a small hand-computed DataFrame are checked against numbers worked out by hand, and a row with a missing actual is confirmed to be excluded from the metrics rather than silently zero-filled.
 - `validate_full_coverage()`, a startup check that raises loudly if January isn't fully covered (wrong row count, or any missing forecast/actual) — this runs automatically whenever the API process starts, not just in tests.
 - API behavior: the forecast endpoint returns the expected row count for a full day, and invalid inputs (out-of-range dates, malformed cutoffs) are rejected with a validation error.
+- The error response shape is consistent whether the error comes from a manual check or from FastAPI's own request validation.
+- `/api/v1/meta` reflects the real loaded data rather than a hardcoded range, and every `response_model`-backed endpoint actually matches its declared schema — this test suite caught a real bug during development: `by-day`'s date column needed an explicit fix to pass its own response model.
 
 ## Possible next steps
 

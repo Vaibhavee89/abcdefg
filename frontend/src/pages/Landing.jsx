@@ -32,8 +32,8 @@ export default function Landing({ cutoff, onNavigate }) {
 
   useEffect(() => {
     Promise.all([
-      get('/api/metrics/summary', { cutoff }),
-      get('/api/forecast', { decision_date: '2026-01-14', cutoff }),
+      get('/metrics/summary', { cutoff }),
+      get('/forecast', { decision_date: '2026-01-14', cutoff }),
     ]).then(([s, f]) => {
       setSum(s)
       setPreview(f.rows.map((r) => ({ hour: r.startTime.slice(11, 16), forecast: r.forecast, actual: r.actual })))

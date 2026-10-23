@@ -1,11 +1,17 @@
+import hashlib
 import os
 import re
 from functools import lru_cache
 from pathlib import Path
+from typing import List, Optional
 
 import pandas as pd
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import metrics
 from .selection import (
@@ -26,8 +32,61 @@ FIRST, LAST = pd.Timestamp("2026-01-01"), pd.Timestamp("2026-01-31")
 CUTOFF_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 DEFAULT_CUTOFF = "09:20"
 
+
+def _iso(ts) -> str:
+    return pd.Timestamp(ts).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _data_version() -> str:
+    """A short, deterministic fingerprint of the loaded dataset: changes if and
+    only if the underlying parquet content (row counts or date range) changes."""
+    fingerprint = "|".join([
+        str(len(F)), str(len(A)),
+        _iso(F["startTime"].min()), _iso(F["startTime"].max()),
+        _iso(F["publishTime"].min()), _iso(F["publishTime"].max()),
+        _iso(A["startTime"].min()), _iso(A["startTime"].max()),
+    ])
+    return hashlib.sha256(fingerprint.encode()).hexdigest()[:12]
+
+
 app = FastAPI(title="Wind Forecast Accuracy API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+API = "/api/v1"
+
+
+# ---------------------------------------------------------------- errors ---
+
+class ErrorDetail(BaseModel):
+    code: str
+    message: str
+
+
+class ErrorResponse(BaseModel):
+    error: ErrorDetail
+
+
+_STATUS_CODES = {400: "bad_request", 404: "not_found", 422: "validation_error", 500: "internal_error"}
+
+
+def _error_response(status_code: int, message: str, code: Optional[str] = None) -> JSONResponse:
+    body = ErrorResponse(error=ErrorDetail(code=code or _STATUS_CODES.get(status_code, "error"), message=message))
+    return JSONResponse(status_code=status_code, content=body.model_dump())
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    return _error_response(exc.status_code, str(exc.detail))
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    return _error_response(422, "Invalid request parameters.")
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    return _error_response(500, "Internal server error.")
 
 
 def check_cutoff(cutoff: str) -> str:
@@ -51,21 +110,142 @@ def records(df: pd.DataFrame) -> list:
     for c in d.columns:
         if pd.api.types.is_datetime64_any_dtype(d[c]):
             d[c] = d[c].dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+        elif d[c].dtype == object:
+            # e.g. by_day()'s "date" column: a plain datetime.date per row (object
+            # dtype, not datetime64), which response_model's strict str validation
+            # won't auto-coerce the way the default JSON encoder used to.
+            non_null = d[c].dropna()
+            if len(non_null) and hasattr(non_null.iloc[0], "isoformat"):
+                d[c] = d[c].map(lambda v: v.isoformat() if hasattr(v, "isoformat") else v)
     return d.astype(object).where(d.notna(), None).to_dict("records")
 
 
-@app.get("/api/health")
+# ---------------------------------------------------------------- models ---
+
+class HealthResponse(BaseModel):
+    status: str
+
+
+class DateRange(BaseModel):
+    first: str
+    last: str
+
+
+class Coverage(BaseModel):
+    decisions: DateRange          # decision dates the API will accept
+    actuals: DateRange            # FUELHH metered actual timestamps available
+    forecast_publishes: DateRange  # WINDFOR publishTime range available
+    forecast_targets: DateRange    # WINDFOR startTime (delivery hour) range available
+
+
+class MetaResponse(BaseModel):
+    data_version: str
+    coverage: Coverage
+    default_cutoff: str
+    timezone: str
+
+
+class ForecastRow(BaseModel):
+    startTime: str
+    publishTime: str
+    forecast: float
+    decision_time: str
+    horizon_h: float
+    actual: Optional[float] = None
+    error: Optional[float] = None
+
+
+class ForecastResponse(BaseModel):
+    decision_date: str
+    cutoff: str
+    rows: List[ForecastRow]
+
+
+class Summary(BaseModel):
+    n: int
+    bias: Optional[float] = None
+    mae: Optional[float] = None
+    rmse: Optional[float] = None
+    p05: Optional[float] = None
+    p50: Optional[float] = None
+    p90: Optional[float] = None
+    p95: Optional[float] = None
+    mean_actual: Optional[float] = None
+    mean_forecast: Optional[float] = None
+    mae_pct_of_mean_actual: Optional[float] = None
+    bias_pct_of_mean_actual: Optional[float] = None
+
+
+class ByHourRow(BaseModel):
+    hour: int
+    n: int
+    bias: Optional[float] = None
+    mae: Optional[float] = None
+    rmse: Optional[float] = None
+    p05: Optional[float] = None
+    p50: Optional[float] = None
+    p90: Optional[float] = None
+    p95: Optional[float] = None
+    mean_actual: Optional[float] = None
+    mean_forecast: Optional[float] = None
+
+
+class ByDayRow(BaseModel):
+    date: str
+    n: int
+    bias: Optional[float] = None
+    mae: Optional[float] = None
+    rmse: Optional[float] = None
+    p05: Optional[float] = None
+    p50: Optional[float] = None
+    p90: Optional[float] = None
+    p95: Optional[float] = None
+    mean_actual: Optional[float] = None
+    mean_forecast: Optional[float] = None
+
+
+class ByHorizonRow(BaseModel):
+    horizon_bucket: int
+    n: int
+    bias: Optional[float] = None
+    mae: Optional[float] = None
+    rmse: Optional[float] = None
+    p05: Optional[float] = None
+    p50: Optional[float] = None
+    p90: Optional[float] = None
+    p95: Optional[float] = None
+    mean_actual: Optional[float] = None
+    mean_forecast: Optional[float] = None
+
+
+class Histogram(BaseModel):
+    counts: List[int]
+    edges: List[float]
+
+
+# ------------------------------------------------------------------ routes ---
+
+@app.get(f"{API}/health", response_model=HealthResponse)
 def health():
     return {"status": "ok"}
 
 
-@app.get("/api/meta")
+@app.get(f"{API}/meta", response_model=MetaResponse)
 def meta():
-    return {"first_decision_date": "2026-01-01", "last_decision_date": "2026-01-31",
-            "default_cutoff": DEFAULT_CUTOFF, "timezone": "UTC"}
+    return {
+        "data_version": _data_version(),
+        "coverage": {
+            "decisions": {"first": FIRST.strftime("%Y-%m-%d"), "last": LAST.strftime("%Y-%m-%d")},
+            "actuals": {"first": _iso(A["startTime"].min()), "last": _iso(A["startTime"].max())},
+            "forecast_publishes": {"first": _iso(F["publishTime"].min()), "last": _iso(F["publishTime"].max())},
+            "forecast_targets": {"first": _iso(F["startTime"].min()), "last": _iso(F["startTime"].max())},
+        },
+        "default_cutoff": DEFAULT_CUTOFF,
+        "timezone": "UTC",
+    }
 
 
-@app.get("/api/forecast")
+@app.get(f"{API}/forecast", response_model=ForecastResponse)
 def forecast(decision_date: str = Query("2026-01-14"), cutoff: str = DEFAULT_CUTOFF):
     """Forecast available at `cutoff` on decision_date, for delivery the next day."""
     check_cutoff(cutoff)
@@ -80,28 +260,28 @@ def forecast(decision_date: str = Query("2026-01-14"), cutoff: str = DEFAULT_CUT
     return {"decision_date": decision_date, "cutoff": cutoff, "rows": records(sel)}
 
 
-@app.get("/api/metrics/summary")
+@app.get(f"{API}/metrics/summary", response_model=Summary)
 def summary(cutoff: str = DEFAULT_CUTOFF):
     check_cutoff(cutoff)
     s = metrics.summary(dataset(cutoff))
     return {k: (None if pd.isna(v) else float(v)) for k, v in s.items()}
 
 
-@app.get("/api/metrics/by-hour")
+@app.get(f"{API}/metrics/by-hour", response_model=List[ByHourRow])
 def by_hour(cutoff: str = DEFAULT_CUTOFF):
     return records(metrics.by_hour(dataset(check_cutoff(cutoff))))
 
 
-@app.get("/api/metrics/by-day")
+@app.get(f"{API}/metrics/by-day", response_model=List[ByDayRow])
 def by_day(cutoff: str = DEFAULT_CUTOFF):
     return records(metrics.by_day(dataset(check_cutoff(cutoff))))
 
 
-@app.get("/api/metrics/by-horizon")
+@app.get(f"{API}/metrics/by-horizon", response_model=List[ByHorizonRow])
 def by_horizon():
     return records(metrics.by_horizon(F, A))
 
 
-@app.get("/api/metrics/histogram")
+@app.get(f"{API}/metrics/histogram", response_model=Histogram)
 def histogram(cutoff: str = DEFAULT_CUTOFF, bins: int = Query(30, ge=5, le=100)):
     return metrics.error_histogram(dataset(check_cutoff(cutoff)), bins=bins)

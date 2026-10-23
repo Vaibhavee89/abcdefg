@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { get } from './api'
 import Landing from './pages/Landing'
 import Forecast from './pages/Forecast'
 import Accuracy from './pages/Accuracy'
@@ -9,14 +10,16 @@ const PRESET_CUTOFFS = [
   { value: '09:50', label: '09:50 · N2EX' },
 ]
 const VALID_TABS = ['home', 'forecast', 'accuracy']
-const DEFAULT_DATE = '2026-01-14'
-const clampDate = (d) => (d < '2026-01-01' ? '2026-01-01' : d > '2026-01-31' ? '2026-01-31' : d)
+// Used only until /meta loads (first paint needs a synchronous value); the
+// real decision-date range comes from the API, not a hardcoded constant.
+const FALLBACK_DATE = '2026-01-14'
+const FALLBACK_CUTOFF = '09:20'
 
 function readUrlState() {
   const p = new URLSearchParams(window.location.search)
   const tab = VALID_TABS.includes(p.get('tab')) ? p.get('tab') : 'home'
-  const cutoff = /^([01]\d|2[0-3]):[0-5]\d$/.test(p.get('cutoff') || '') ? p.get('cutoff') : '09:20'
-  const date = /^\d{4}-\d{2}-\d{2}$/.test(p.get('date') || '') ? clampDate(p.get('date')) : DEFAULT_DATE
+  const cutoff = /^([01]\d|2[0-3]):[0-5]\d$/.test(p.get('cutoff') || '') ? p.get('cutoff') : FALLBACK_CUTOFF
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(p.get('date') || '') ? p.get('date') : FALLBACK_DATE
   return { tab, cutoff, date }
 }
 
@@ -45,7 +48,26 @@ export default function App() {
   const [date, setDate] = useState(init.date)
   const [advancedCutoff, setAdvancedCutoff] = useState(!PRESET_CUTOFFS.some((c) => c.value === init.cutoff))
   const [theme, setTheme] = useState(readStoredTheme)
+  const [meta, setMeta] = useState(null)
   const clock = useUtcClock()
+
+  useEffect(() => {
+    get('/meta').then(setMeta).catch(() => {})
+  }, [])
+
+  // Once the real coverage is known, clamp the current date into range —
+  // covers a stale/out-of-range date arriving via a shared URL.
+  useEffect(() => {
+    if (!meta) return
+    const { first, last } = meta.coverage.decisions
+    setDate((d) => (d < first ? first : d > last ? last : d))
+  }, [meta])
+
+  const clampDate = (d) => {
+    if (!meta) return d
+    const { first, last } = meta.coverage.decisions
+    return d < first ? first : d > last ? last : d
+  }
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
@@ -98,7 +120,7 @@ export default function App() {
         </div>
       </div>
       {tab === 'home' && <Landing cutoff={cutoff} onNavigate={setTab} />}
-      {tab === 'forecast' && <Forecast cutoff={cutoff} date={date} setDate={(d) => setDate(clampDate(d))} />}
+      {tab === 'forecast' && <Forecast cutoff={cutoff} date={date} setDate={(d) => setDate(clampDate(d))} meta={meta} />}
       {tab === 'accuracy' && <Accuracy cutoff={cutoff} />}
     </div>
   )
