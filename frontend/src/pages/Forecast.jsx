@@ -41,10 +41,10 @@ function TooltipCard({ active, payload, label }) {
 export default function Forecast({ cutoff, date, setDate, meta }) {
   const bounds = meta?.coverage?.decisions ?? null
   const { data: bundle, loading, error, retry } = useApi(
-    () => Promise.all([
-      get('/forecast', { decision_date: date, cutoff }),
-      get('/metrics/summary', { cutoff }),
-      get('/metrics/by-day', { cutoff }),
+    (signal) => Promise.all([
+      get('/forecast', { decision_date: date, cutoff }, signal),
+      get('/metrics/summary', { cutoff }, signal),
+      get('/metrics/by-day', { cutoff }, signal),
     ]).then(([f, s, byDay]) => ({ rows: f.rows, sum: s, byDay })),
     [date, cutoff]
   )
@@ -75,16 +75,21 @@ export default function Forecast({ cutoff, date, setDate, meta }) {
     band: [Math.max(0, r.forecast - p90), r.forecast],
   })), [rows, p90])
 
-  const runs = [...new Set(rows.map((r) => r.publishTime))]
-  const peak = data.reduce((a, b) => (b.forecast > (a?.forecast ?? -Infinity) ? b : a), null)
-  const meanF = data.length ? data.reduce((s, r) => s + r.forecast, 0) / data.length : null
-  const meanA = data.length ? data.reduce((s, r) => s + (r.actual ?? 0), 0) / data.length : null
-  const meanErr = data.length ? data.reduce((s, r) => s + (r.error ?? 0), 0) / data.length : null
-  const biggestMiss = data.reduce((a, b) => (Math.abs(b.error ?? 0) > Math.abs(a?.error ?? 0) ? b : a), null)
+  const runs = useMemo(() => [...new Set(rows.map((r) => r.publishTime))], [rows])
 
-  const biggestMissDay = byDay.length ? byDay.reduce((a, b) => (b.mae > a.mae ? b : a)) : null
-  const mostAccurateDay = byDay.length ? byDay.reduce((a, b) => (b.mae < a.mae ? b : a)) : null
-  const windiestDay = byDay.length ? byDay.reduce((a, b) => (b.mean_actual > a.mean_actual ? b : a)) : null
+  const { peak, meanF, meanA, meanErr, biggestMiss } = useMemo(() => ({
+    peak: data.reduce((a, b) => (b.forecast > (a?.forecast ?? -Infinity) ? b : a), null),
+    meanF: data.length ? data.reduce((s, r) => s + r.forecast, 0) / data.length : null,
+    meanA: data.length ? data.reduce((s, r) => s + (r.actual ?? 0), 0) / data.length : null,
+    meanErr: data.length ? data.reduce((s, r) => s + (r.error ?? 0), 0) / data.length : null,
+    biggestMiss: data.reduce((a, b) => (Math.abs(b.error ?? 0) > Math.abs(a?.error ?? 0) ? b : a), null),
+  }), [data])
+
+  const { biggestMissDay, mostAccurateDay, windiestDay } = useMemo(() => ({
+    biggestMissDay: byDay.length ? byDay.reduce((a, b) => (b.mae > a.mae ? b : a)) : null,
+    mostAccurateDay: byDay.length ? byDay.reduce((a, b) => (b.mae < a.mae ? b : a)) : null,
+    windiestDay: byDay.length ? byDay.reduce((a, b) => (b.mean_actual > a.mean_actual ? b : a)) : null,
+  }), [byDay])
 
   const isFirstLoad = loading && !bundle
 

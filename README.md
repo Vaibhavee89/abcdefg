@@ -111,6 +111,7 @@ All routes are versioned under `/api/v1`. Every response (success and error) has
 | `/api/v1/metrics/by-day` | `cutoff` | the above, broken down by decision date |
 | `/api/v1/metrics/by-horizon` | — | accuracy vs. forecast lead time (6h buckets) |
 | `/api/v1/metrics/histogram` | `cutoff`, `bins` | error distribution histogram |
+| `/api/v1/metrics/heatmap` | `cutoff` | one row per (date, hour) with its error — the raw 31×24 grid the Accuracy page's heatmap draws from |
 
 Every request is logged as one JSON line (`rid`, `method`, `path`, `status`, `ms`) and gets a matching `X-Request-ID` response header, so a slow or failing request in production logs can be traced back to the exact client-visible response.
 
@@ -122,6 +123,8 @@ See [docs/decisions.md](docs/decisions.md) for the longer rationale behind the c
 - Selection and metrics logic are pure functions, independent of the API layer, so they're directly unit-testable without spinning up a server.
 - The decision cutoff is a parameter throughout, not a hardcoded constant, so the sensitivity check (09:20 vs. 09:50) required no code changes.
 - The "cautious plan" line shown on the forecast chart subtracts the full-January P90 from the forecast. It illustrates the size of a sensible buffer; it is not a back-tested trading rule and should not be read as one.
+- `tab`, `date`, and `cutoff` are kept in the URL query string, and all data fetching goes through one small hook (`useApi`) that cancels its in-flight request (via `AbortController`) whenever its dependencies change again before it resolves. Flipping through delivery dates quickly can't show a stale day's data arriving late, and every view is a shareable link.
+- The Accuracy page's hour × day error heatmap is a custom visualisation rather than a stock chart type, specifically because the overnight bias pattern (see Key findings) is visible there in a way a bar chart averaging across all 31 days can't show — each cell is one real settlement period's error, not an aggregate.
 
 ## Testing
 

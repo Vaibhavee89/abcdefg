@@ -1,10 +1,13 @@
+import { useMemo } from 'react'
 import { ResponsiveContainer, ComposedChart, BarChart, LineChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine, Cell } from 'recharts'
 import { get } from '../api'
 import { useApi } from '../useApi'
 import { mw, gw, signedGw } from '../format'
 import { GLOSSARY } from '../glossary'
+import { exportCsv } from '../csv'
 import InfoTip from '../components/InfoTip'
 import HowToRead from '../components/HowToRead'
+import Heatmap from '../components/Heatmap'
 import { SkeletonCard, RetryBanner } from '../components/Skeleton'
 
 function Kpi({ eyebrow, info, value, unit, sub, variant, chip, subtitle }) {
@@ -20,15 +23,22 @@ function Kpi({ eyebrow, info, value, unit, sub, variant, chip, subtitle }) {
 
 export default function Accuracy({ cutoff }) {
   const { data: d, loading, error, retry } = useApi(
-    () => Promise.all([
-      get('/metrics/summary', { cutoff }),
-      get('/metrics/by-hour', { cutoff }),
-      get('/metrics/by-horizon'),
-      get('/metrics/histogram', { cutoff }),
-      get('/metrics/by-day', { cutoff }),
-    ]).then(([summary, byHour, byHorizon, hist, byDay]) => ({ summary, byHour, byHorizon, hist, byDay })),
+    (signal) => Promise.all([
+      get('/metrics/summary', { cutoff }, signal),
+      get('/metrics/by-hour', { cutoff }, signal),
+      get('/metrics/by-horizon', {}, signal),
+      get('/metrics/histogram', { cutoff }, signal),
+      get('/metrics/by-day', { cutoff }, signal),
+      get('/metrics/heatmap', { cutoff }, signal),
+    ]).then(([summary, byHour, byHorizon, hist, byDay, heatmap]) => ({ summary, byHour, byHorizon, hist, byDay, heatmap })),
     [cutoff]
   )
+
+  const histData = useMemo(() => d ? d.hist.counts.map((c, i) => ({
+    bin: Math.round((d.hist.edges[i] + d.hist.edges[i + 1]) / 2), count: c,
+  })) : [], [d])
+  const horizon = useMemo(() => d ? d.byHorizon.filter((r) => r.n >= 1000) : [], [d])
+  const byHourData = useMemo(() => d ? d.byHour.map((r) => ({ ...r, hourLabel: String(r.hour).padStart(2, '0') + ':00' })) : [], [d])
 
   if (!d && loading) {
     return (
@@ -44,9 +54,6 @@ export default function Accuracy({ cutoff }) {
   }
 
   const s = d.summary
-  const histData = d.hist.counts.map((c, i) => ({ bin: Math.round((d.hist.edges[i] + d.hist.edges[i + 1]) / 2), count: c }))
-  const horizon = d.byHorizon.filter((r) => r.n >= 1000)
-  const byHourData = d.byHour.map((r) => ({ ...r, hourLabel: String(r.hour).padStart(2, '0') + ':00' }))
 
   return (
     <section className="page">
@@ -61,6 +68,7 @@ export default function Accuracy({ cutoff }) {
       <HowToRead>
         <p>This page summarises how accurate the day-ahead forecast has been across the whole of January 2026, at your chosen decision cutoff.</p>
         <p>Hover the ⓘ next to any metric label for a plain-English explanation. <b>Bias</b> and <b>MAE</b>/<b>RMSE</b> describe typical error size; <b>P90</b>/<b>P95</b> are buffers you could add to a forecast to cover most or nearly all of the historical over-forecast risk.</p>
+        <p>The hour × day heatmap below shows every individual error, not an average — hover or tab to a cell for its exact value. It makes patterns like the overnight bias visible at a glance, where a bar chart would only show the average across all days.</p>
       </HowToRead>
 
       <div className="banner">
@@ -88,6 +96,26 @@ export default function Accuracy({ cutoff }) {
         <Kpi eyebrow="RMSE" info={GLOSSARY.rmse} value={gw(s.rmse)} unit="GW" sub={`Penalises large outliers · ${mw(s.rmse)} MW`} />
         <Kpi eyebrow="Suggested buffer" subtitle="P90 over-forecast" info={GLOSSARY.p90} value={signedGw(s.p90)} unit="GW" sub={`90% of over-forecasts fall below this · ${mw(s.p90)} MW`} variant="emph" chip={<span className="chip ok">TARGET BUFFER</span>} />
         <Kpi eyebrow="Defensive buffer" subtitle="P95 over-forecast" info={GLOSSARY.p95} value={signedGw(s.p95)} unit="GW" sub={`95% of over-forecasts fall below this · ${mw(s.p95)} MW`} variant="emph" chip={<span className="chip ok">EXTREME TAIL</span>} />
+      </div>
+
+      <div className={`card${loading ? ' dimmed' : ''}`}>
+        <div className="card-head">
+          <div>
+            <p className="card-eyebrow">Hour × Day Detail</p>
+            <h2 className="card-title">Error heatmap — every settlement period in January</h2>
+            <p className="card-sub">Each cell is one hour's error on one decision date (31 days × 24 hours = {d.heatmap.length} cells). Orange = forecast too high (shortfall risk), green = forecast too low (surplus); darker means a bigger miss. Hover or tab to a cell for its exact value.</p>
+          </div>
+          <button className="export-btn" onClick={() => exportCsv(
+            `heatmap_${cutoff.replace(':', '')}.csv`,
+            [
+              { label: 'Date', value: (r) => r.date },
+              { label: 'Hour (UTC)', value: (r) => r.hour },
+              { label: 'Error (MW)', value: (r) => (r.error == null ? '' : Math.round(r.error)) },
+            ],
+            d.heatmap
+          )}>⬇ Export CSV</button>
+        </div>
+        <Heatmap cells={d.heatmap} />
       </div>
 
       <div className={`grid-2${loading ? ' dimmed' : ''}`}>

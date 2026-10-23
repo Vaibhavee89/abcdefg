@@ -253,6 +253,12 @@ class Histogram(BaseModel):
     edges: List[float]
 
 
+class HeatmapCell(BaseModel):
+    date: str
+    hour: int
+    error: Optional[float] = None
+
+
 # ------------------------------------------------------------------ routes ---
 
 @app.get(f"{API}/health", response_model=HealthResponse)
@@ -315,3 +321,9 @@ def by_horizon():
 @app.get(f"{API}/metrics/histogram", response_model=Histogram)
 def histogram(cutoff: str = DEFAULT_CUTOFF, bins: int = Query(30, ge=5, le=100)):
     return metrics.error_histogram(dataset(check_cutoff(cutoff)), bins=bins)
+
+
+@app.get(f"{API}/metrics/heatmap", response_model=List[HeatmapCell])
+def heatmap(cutoff: str = DEFAULT_CUTOFF):
+    """One row per (date, hour) — the raw grid a 31-day x 24-hour error heatmap draws from."""
+    return records(metrics.heatmap(dataset(check_cutoff(cutoff))))

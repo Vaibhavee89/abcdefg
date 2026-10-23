@@ -281,3 +281,14 @@ footer.desk-footer nav { display: flex; gap: 16px; }
 .export-btn:hover { background: var(--well); border-color: var(--primary-deep); }
 
 .pending-chip { color: var(--ink-muted); font-style: italic; }
+
+/* Heatmap */
+.heatmap-wrap { position: relative; overflow-x: auto; padding-bottom: 4px; }
+.heatmap-axis-label { font-family: var(--font-body); font-size: 10px; fill: var(--ink-muted); }
+.heatmap-wrap rect { cursor: pointer; outline: none; }
+.heatmap-wrap rect:focus-visible { stroke: var(--primary-deep); stroke-width: 2; }
+.heatmap-tooltip { position: absolute; z-index: 10; pointer-events: none; transform: translate(-50%, -110%); min-width: 160px; }
+.heatmap-legend { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
+.heatmap-legend-label { font-size: 11px; color: var(--ink-muted); white-space: nowrap; }
+.heatmap-legend-bar { width: 60px; height: 10px; border-radius: 2px; background: linear-gradient(to right, rgba(61,139,64,0.96), rgba(61,139,64,0.06)); }
+.heatmap-legend-bar.reverse { background: linear-gradient(to right, rgba(217,72,15,0.06), rgba(217,72,15,0.96)); }

@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { ResponsiveContainer, ComposedChart, Area, Line, XAxis, Tooltip } from 'recharts'
 import { get } from '../api'
+import { useApi } from '../useApi'
 import HowToRead from '../components/HowToRead'
 
 const mw = (v) => (v == null ? '–' : Math.round(v).toLocaleString())
@@ -25,24 +26,29 @@ const FEATURES = [
 ]
 
 export default function Landing({ cutoff, onNavigate }) {
-  const [sum, setSum] = useState(null)
-  const [preview, setPreview] = useState([])
   const [capacity, setCapacity] = useState(2500)
   const [tier, setTier] = useState('p90')
 
-  useEffect(() => {
-    Promise.all([
-      get('/metrics/summary', { cutoff }),
-      get('/forecast', { decision_date: '2026-01-14', cutoff }),
-    ]).then(([s, f]) => {
-      setSum(s)
-      setPreview(f.rows.map((r) => ({ hour: r.startTime.slice(11, 16), forecast: r.forecast, actual: r.actual })))
-    }).catch(() => {})
-  }, [cutoff])
+  const { data: bundle } = useApi(
+    (signal) => Promise.all([
+      get('/metrics/summary', { cutoff }, signal),
+      get('/forecast', { decision_date: '2026-01-14', cutoff }, signal),
+    ]).then(([s, f]) => ({ sum: s, rows: f.rows })),
+    [cutoff]
+  )
 
-  const meanActual = sum ? (100 * sum.mae) / sum.mae_pct_of_mean_actual : null
-  const bufferPctOfMean = sum && meanActual ? (sum[tier] / meanActual) * 100 : null
-  const recommendedBuffer = bufferPctOfMean != null ? (capacity * bufferPctOfMean) / 100 : null
+  const sum = bundle?.sum ?? null
+  const preview = useMemo(
+    () => (bundle?.rows ?? []).map((r) => ({ hour: r.startTime.slice(11, 16), forecast: r.forecast, actual: r.actual })),
+    [bundle]
+  )
+
+  const { bufferPctOfMean, recommendedBuffer } = useMemo(() => {
+    const meanActual = sum ? (100 * sum.mae) / sum.mae_pct_of_mean_actual : null
+    const bufferPctOfMean = sum && meanActual ? (sum[tier] / meanActual) * 100 : null
+    const recommendedBuffer = bufferPctOfMean != null ? (capacity * bufferPctOfMean) / 100 : null
+    return { bufferPctOfMean, recommendedBuffer }
+  }, [sum, tier, capacity])
 
   return (
     <section className="page landing">

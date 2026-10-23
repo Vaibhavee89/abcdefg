@@ -66,3 +66,12 @@ def test_every_response_carries_a_request_id():
     for r in [c.get("/api/v1/health"), c.get("/api/v1/metrics/summary", params={"cutoff": "9am"})]:
         rid = r.headers.get("x-request-id")
         assert rid and len(rid) == 8
+
+def test_heatmap_covers_every_hour_of_every_day():
+    r = c.get("/api/v1/metrics/heatmap")
+    assert r.status_code == 200
+    cells = r.json()
+    assert len(cells) == 31 * 24
+    assert {c["hour"] for c in cells} == set(range(24))
+    assert len({c["date"] for c in cells}) == 31
+    assert all(c["error"] is not None for c in cells)

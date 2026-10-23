@@ -54,3 +54,11 @@ def error_histogram(df, bins=30):
     e = df["error"].dropna()
     counts, edges = np.histogram(e, bins=bins)
     return {"counts": counts.tolist(), "edges": edges.tolist()}
+
+def heatmap(df):
+    """One row per (decision date, delivery hour) with its error — the raw
+    grid a hour-x-day heatmap is drawn from, not pre-aggregated like by_hour/by_day."""
+    d = df[["startTime", "error"]].copy()
+    d["date"] = d["startTime"].dt.date
+    d["hour"] = d["startTime"].dt.hour
+    return d[["date", "hour", "error"]].sort_values(["date", "hour"]).reset_index(drop=True)
