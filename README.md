@@ -1,4 +1,4 @@
-# Wind Forecast Desk
+# Energy Forecast Desk
 
 A day-ahead wind forecast decision-support tool for a UK energy utility's power buying team. It does two things: (1) shows the wind generation forecast that was actually available at the moment a buyer would have committed to a decision, and (2) quantifies how accurate that forecast turned out to be, so a buyer can size a safety buffer instead of guessing one.
 

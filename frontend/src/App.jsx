@@ -87,7 +87,7 @@ export default function App() {
       <div className="brand-strip" />
       <div className="topbar">
         <div className="brand">
-          <div className="brandmark" style={{ cursor: 'pointer' }} onClick={() => setTab('home')}><span className="dot" />WIND FORECAST DESK</div>
+          <div className="brandmark" style={{ cursor: 'pointer' }} onClick={() => setTab('home')}><span className="dot" />ENERGY FORECAST DESK</div>
           <nav className="topnav">
             <button className={tab === 'home' ? 'on' : ''} onClick={() => setTab('home')}>Home</button>
             <button className={tab === 'forecast' ? 'on' : ''} onClick={() => setTab('forecast')}>Forecast</button>

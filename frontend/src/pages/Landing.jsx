@@ -112,7 +112,7 @@ export default function Landing({ cutoff, onNavigate }) {
           </ul>
         </div>
         <div className="card compare-card good">
-          <p className="card-eyebrow">WIND FORECAST DESK</p>
+          <p className="card-eyebrow">ENERGY FORECAST DESK</p>
           <h3 className="card-title" style={{ fontSize: 16 }}>Decision-anchored analysis</h3>
           <ul className="compare-list good">
             {DESK.map((t) => <li key={t}>{t}</li>)}
@@ -180,7 +180,7 @@ export default function Landing({ cutoff, onNavigate }) {
       <div className="card about-card">
         <p className="card-eyebrow">ABOUT THIS PROJECT</p>
         <p className="card-sub" style={{ fontSize: 13 }}>
-          Wind Forecast Desk is a day-ahead wind forecast accuracy analysis built on public Elexon BMRS data (FUELHH actuals,
+          Energy Forecast Desk is a day-ahead wind forecast accuracy analysis built on public Elexon BMRS data (FUELHH actuals,
           WINDFOR forecasts) for January 2026. All figures on this page are computed live by the FastAPI backend from the
           underlying dataset — nothing here is a simulated testimonial, audited result, or live trading feed.
         </p>
@@ -198,7 +198,7 @@ export default function Landing({ cutoff, onNavigate }) {
       </div>
 
       <footer className="desk-footer">
-        <span>Wind Forecast Desk · Elexon BMRS static dataset (Jan 2026) · Cutoff assumption: {cutoff} UTC day-ahead gate closure</span>
+        <span>Energy Forecast Desk · Elexon BMRS static dataset (Jan 2026) · Cutoff assumption: {cutoff} UTC day-ahead gate closure</span>
         <nav><span>Data Methodology</span><span>BMRS Feed</span><span>Settlement API</span></nav>
       </footer>
     </section>

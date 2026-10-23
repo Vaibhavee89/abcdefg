@@ -10,8 +10,8 @@ export default defineConfig({
       injectRegister: false,
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Wind Forecast Desk',
-        short_name: 'Wind Desk',
+        name: 'Energy Forecast Desk',
+        short_name: 'Energy Desk',
         description: 'GB day-ahead wind forecast accuracy and safety-buffer sizing, built on Elexon BMRS data.',
         theme_color: '#2d4a30',
         background_color: '#f7f9f7',

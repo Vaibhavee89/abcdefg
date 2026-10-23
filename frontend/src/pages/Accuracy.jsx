@@ -232,7 +232,7 @@ export default function Accuracy({ cutoff }) {
       </div>
 
       <footer className="desk-footer">
-        <span>© 2026 Wind Forecast Desk · Elexon BMRS static dataset (Jan 2026) · Cutoff assumption: {cutoff} UTC day-ahead gate closure</span>
+        <span>© 2026 Energy Forecast Desk · Elexon BMRS static dataset (Jan 2026) · Cutoff assumption: {cutoff} UTC day-ahead gate closure</span>
         <nav><span>Data Methodology</span><span>BMRS Feed</span><span>Settlement API</span></nav>
       </footer>
     </section>
