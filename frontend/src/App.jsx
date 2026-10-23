@@ -4,7 +4,10 @@ import Forecast from './pages/Forecast'
 import Accuracy from './pages/Accuracy'
 import './App.css'
 
-const PRESET_CUTOFFS = ['09:00', '09:30']
+const PRESET_CUTOFFS = [
+  { value: '09:20', label: '09:20 · EPEX GB' },
+  { value: '09:50', label: '09:50 · N2EX' },
+]
 const VALID_TABS = ['home', 'forecast', 'accuracy']
 const DEFAULT_DATE = '2026-01-14'
 const clampDate = (d) => (d < '2026-01-01' ? '2026-01-01' : d > '2026-01-31' ? '2026-01-31' : d)
@@ -12,7 +15,7 @@ const clampDate = (d) => (d < '2026-01-01' ? '2026-01-01' : d > '2026-01-31' ? '
 function readUrlState() {
   const p = new URLSearchParams(window.location.search)
   const tab = VALID_TABS.includes(p.get('tab')) ? p.get('tab') : 'home'
-  const cutoff = /^([01]\d|2[0-3]):[0-5]\d$/.test(p.get('cutoff') || '') ? p.get('cutoff') : '09:00'
+  const cutoff = /^([01]\d|2[0-3]):[0-5]\d$/.test(p.get('cutoff') || '') ? p.get('cutoff') : '09:20'
   const date = /^\d{4}-\d{2}-\d{2}$/.test(p.get('date') || '') ? clampDate(p.get('date')) : DEFAULT_DATE
   return { tab, cutoff, date }
 }
@@ -40,7 +43,7 @@ export default function App() {
   const [tab, setTab] = useState(init.tab)
   const [cutoff, setCutoff] = useState(init.cutoff)
   const [date, setDate] = useState(init.date)
-  const [advancedCutoff, setAdvancedCutoff] = useState(!PRESET_CUTOFFS.includes(init.cutoff))
+  const [advancedCutoff, setAdvancedCutoff] = useState(!PRESET_CUTOFFS.some((c) => c.value === init.cutoff))
   const [theme, setTheme] = useState(readStoredTheme)
   const clock = useUtcClock()
 
@@ -74,10 +77,10 @@ export default function App() {
           <div className="cutoff-chips">
             {PRESET_CUTOFFS.map((c) => (
               <button
-                key={c}
-                className={!advancedCutoff && cutoff === c ? 'chip-btn on' : 'chip-btn'}
-                onClick={() => { setAdvancedCutoff(false); setCutoff(c) }}
-              >{c}</button>
+                key={c.value}
+                className={!advancedCutoff && cutoff === c.value ? 'chip-btn on' : 'chip-btn'}
+                onClick={() => { setAdvancedCutoff(false); setCutoff(c.value) }}
+              >{c.label}</button>
             ))}
             <button className={advancedCutoff ? 'chip-btn on' : 'chip-btn'} onClick={() => setAdvancedCutoff(true)}>Advanced</button>
             {advancedCutoff && (

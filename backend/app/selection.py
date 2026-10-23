@@ -16,7 +16,7 @@ def prep_actuals_hourly(a: pd.DataFrame) -> pd.DataFrame:
     out = g.mean().where(g.count() == 2)
     return out.rename("actual").reset_index()
 
-def select_for_decision(f, decision_date, cutoff="09:00"):
+def select_for_decision(f, decision_date, cutoff="09:20"):
     """Decision made on decision_date at `cutoff` (UTC) for delivery on the next day.
     For each hourly slot, take the forecast with max publishTime <= cutoff."""
     d = pd.Timestamp(decision_date, tz="UTC").normalize()
@@ -29,7 +29,7 @@ def select_for_decision(f, decision_date, cutoff="09:00"):
                  horizon_h=(x["startTime"] - x["publishTime"]).dt.total_seconds() / 3600)
     return x.reset_index(drop=True)
 
-def build_dataset(f, a_hourly, first="2026-01-01", last="2026-01-31", cutoff="09:00"):
+def build_dataset(f, a_hourly, first="2026-01-01", last="2026-01-31", cutoff="09:20"):
     days = pd.date_range(first, last, freq="D")
     sel = pd.concat([select_for_decision(f, d, cutoff) for d in days], ignore_index=True)
     out = sel.merge(a_hourly, on="startTime", how="left")

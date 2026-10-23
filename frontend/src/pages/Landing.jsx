@@ -7,7 +7,7 @@ const mw = (v) => (v == null ? '–' : Math.round(v).toLocaleString())
 const signed = (v) => (v == null ? '–' : (v >= 0 ? '+' : '') + Math.round(v).toLocaleString())
 
 const CONVENTIONAL = [
-  'Unanchored horizon drift: forecast updates straddle the 09:00 UTC day-ahead gate, so buyers mix data from before and after their own commitment point.',
+  'Unanchored horizon drift: forecast updates straddle the day-ahead gate (09:20 UTC for EPEX GB, 09:50 UTC for N2EX), so buyers mix data from before and after their own commitment point.',
   'Asymmetric over-forecast penalties go unquantified: forecasts treat over- and under-forecast as equally likely, when only one direction causes a shortfall at gate closure.',
   'Ad-hoc spreadsheet guesswork: traders manually pad 10–15% of wind output with no objective tie to historical error during high-risk periods.',
 ]
@@ -18,7 +18,7 @@ const DESK = [
 ]
 
 const FEATURES = [
-  { n: '01', t: 'Gate-closure cutoff enforcement', d: 'Every forecast is the latest WINDFOR run published at or before your configured decision time (09:00 UTC default).' },
+  { n: '01', t: 'Gate-closure cutoff enforcement', d: 'Every forecast is the latest WINDFOR run published at or before your configured decision time (09:20 UTC / EPEX GB default).' },
   { n: '02', t: 'Empirical tail risk sizing (P90 / P95)', d: 'Buffers come straight from the observed January 2026 error distribution — no flat-percentage rule of thumb.' },
   { n: '03', t: 'Diurnal & horizon diagnostics', d: 'Decompose error across all 24 settlement hours and across lead time, from same-day to 2+ days ahead.' },
   { n: '04', t: 'Documented REST API', d: 'A FastAPI backend with interactive docs — every number on this site is computed live, not hard-coded.' },

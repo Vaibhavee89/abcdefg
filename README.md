@@ -71,18 +71,18 @@ python backend/app/fetch_data.py
 
 ## Key assumptions
 
-- Decision cutoff is 09:00 UTC on D-1, and is configurable in the UI. GB local time equals UTC in January, so no timezone conversion is needed. The real day-ahead gate closure time should be verified independently; 09:30 was also tested as a sensitivity check.
+- Decision cutoff is 09:20 UK/UTC on D-1, the EPEX GB hourly day-ahead gate closure. The N2EX auction closes at 09:50. WINDFOR runs are published at :30 past the hour, so 09:20 uses the 07:30 run and 09:50 uses the 09:30 run. Both are selectable in the UI.
 - Decision dates run 1–31 Jan 2026, so delivery dates run 2 Jan – 1 Feb 2026.
 - All times are UTC, all generation values are MW.
 - The lead-time breakdown hides buckets with fewer than 1,000 samples, since those are too small to read reliably.
 
-## Key findings (January 2026, 09:00 UTC cutoff, n = 744 hourly slots)
+## Key findings (January 2026, 09:20 UTC cutoff, n = 744 hourly slots)
 
 - Bias: +1,748 MW (+15.5% of mean actual wind). MAE: 2,039 MW (18.1%). RMSE: 2,505 MW.
 - The error is asymmetric: P95 over-forecast is +5,283 MW and P90 is +4,098 MW, while P05 is only −1,151 MW. The expensive misses are concentrated in the direction where actual wind came in well below forecast.
 - Bias is positive in every hour of the day (largest overnight, around 2.3 GW at 02:00–06:00 UTC) and on 87% of days. It also grows with the forecast level — roughly +0.4 GW in the lowest-wind quintile versus roughly +3.5 GW in the highest. Even the near-real-time forecast (latest run before the delivery hour) carries about +1.5 GW of bias, so most of the effect is not simply a lead-time/decay artifact.
 - Error spread (P95, RMSE) increases with forecast lead time, as expected.
-- The result is not very sensitive to the exact cutoff: moving it from 09:00 to 09:30 changes MAE by about 1% (2,039 → 2,013 MW).
+- The result is not very sensitive to the exact cutoff: moving it from 09:20 to 09:50 changes MAE by about 1% (2,039 → 2,013 MW).
 - The cause of the persistent over-forecast is not confirmed. Plausible explanations — for example curtailment, or a scope difference between what WINDFOR forecasts and what FUELHH meters — were not tested against additional data. The bias is reported as observed and is not silently corrected anywhere in the app.
 
 ## API endpoints
@@ -102,7 +102,7 @@ python backend/app/fetch_data.py
 
 - Data is pre-fetched into parquet and cached in memory at startup rather than queried from Elexon per request — this keeps the API reliable and fast on a serverless deployment, at the cost of needing a manual refresh to pick up new data.
 - Selection and metrics logic are pure functions, independent of the API layer, so they're directly unit-testable without spinning up a server.
-- The decision cutoff is a parameter throughout, not a hardcoded constant, so the sensitivity check (09:00 vs. 09:30) required no code changes.
+- The decision cutoff is a parameter throughout, not a hardcoded constant, so the sensitivity check (09:20 vs. 09:50) required no code changes.
 - The "cautious plan" line shown on the forecast chart subtracts the full-January P90 from the forecast. It illustrates the size of a sensible buffer; it is not a back-tested trading rule and should not be read as one.
 
 ## Testing

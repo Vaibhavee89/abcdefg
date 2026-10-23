@@ -51,11 +51,11 @@ def health():
 @app.get("/api/meta")
 def meta():
     return {"first_decision_date": "2026-01-01", "last_decision_date": "2026-01-31",
-            "default_cutoff": "09:00", "timezone": "UTC"}
+            "default_cutoff": "09:20", "timezone": "UTC"}
 
 
 @app.get("/api/forecast")
-def forecast(decision_date: str = Query("2026-01-14"), cutoff: str = "09:00"):
+def forecast(decision_date: str = Query("2026-01-14"), cutoff: str = "09:20"):
     """Forecast available at `cutoff` on decision_date, for delivery the next day."""
     check_cutoff(cutoff)
     try:
@@ -70,19 +70,19 @@ def forecast(decision_date: str = Query("2026-01-14"), cutoff: str = "09:00"):
 
 
 @app.get("/api/metrics/summary")
-def summary(cutoff: str = "09:00"):
+def summary(cutoff: str = "09:20"):
     check_cutoff(cutoff)
     s = metrics.summary(dataset(cutoff))
     return {k: (None if pd.isna(v) else float(v)) for k, v in s.items()}
 
 
 @app.get("/api/metrics/by-hour")
-def by_hour(cutoff: str = "09:00"):
+def by_hour(cutoff: str = "09:20"):
     return records(metrics.by_hour(dataset(check_cutoff(cutoff))))
 
 
 @app.get("/api/metrics/by-day")
-def by_day(cutoff: str = "09:00"):
+def by_day(cutoff: str = "09:20"):
     return records(metrics.by_day(dataset(check_cutoff(cutoff))))
 
 
@@ -92,5 +92,5 @@ def by_horizon():
 
 
 @app.get("/api/metrics/histogram")
-def histogram(cutoff: str = "09:00", bins: int = Query(30, ge=5, le=100)):
+def histogram(cutoff: str = "09:20", bins: int = Query(30, ge=5, le=100)):
     return metrics.error_histogram(dataset(check_cutoff(cutoff)), bins=bins)
