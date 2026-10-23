@@ -7,4 +7,9 @@ export const GLOSSARY = {
   error: 'Error = Forecast − Actual. Positive means the forecast was too high (shortfall risk); negative means it was too low (surplus).',
   cutoff: 'The time of day a trading decision is made. Only forecast runs published at or before this time are used.',
   horizon: 'How many hours ahead of delivery the forecast was published — shorter horizons are usually more accurate.',
+  deskAction: 'An illustrative label based on that hour’s error (forecast minus actual), not a calibrated trading rule: Covered (≤ −150 MW) — forecast too low, actual delivery exceeded the bought amount, surplus. Neutral (−150 to +150 MW) — miss too small to flag. Shortfall Alert (+150 to +800 MW) — forecast too high, a likely shortfall. Trim Day-Ahead Bid (≥ +800 MW) — a large over-forecast; suggests reducing the day-ahead bid for that hour.',
+  deskActionCovered: 'Error ≤ −150 MW: the forecast was too low, so actual delivery exceeded the bought amount — a surplus, not a shortfall.',
+  deskActionNeutral: 'Error between −150 and +150 MW: small enough in either direction that no action is flagged.',
+  deskActionShortfall: 'Error between +150 and +800 MW: the forecast overstated wind meaningfully — a likely shortfall that hour.',
+  deskActionTrim: 'Error ≥ +800 MW: a large over-forecast. The suggested action is to reduce the day-ahead bid for that hour.',
 }

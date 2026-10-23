@@ -230,7 +230,7 @@ export default function Forecast({ cutoff, date, setDate, meta }) {
           <table className="desk-table">
             <thead>
               <tr>
-                <th>Hour (UTC)</th><th>Horizon (+h)</th><th>Forecast (MW)</th><th>Actual (MW)</th><th>Cautious Plan (MW)</th><th>Error (F − A)</th><th>Desk Action</th>
+                <th>Hour (UTC)</th><th>Horizon (+h)</th><th>Forecast (MW)</th><th>Actual (MW)</th><th>Cautious Plan (MW)</th><th>Error (F − A)</th><th>Desk Action<InfoTip text={GLOSSARY.deskAction} /></th>
               </tr>
             </thead>
             <tbody>
