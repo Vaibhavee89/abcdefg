@@ -4,7 +4,7 @@ A day-ahead wind forecast decision-support tool for a UK energy utility's power 
 
 Data: Elexon BMRS only (FUELHH actuals, fuelType WIND; WINDFOR forecasts), Great Britain national level. Pre-fetched into `data/*.parquet`, covering 24 Dec 2025 to 3 Feb 2026 — padded on both sides of January so no forecast or actual near the month's edges is missing.
 
-**Live app:** https://frontend-five-pearl-71.vercel.app/?tab=home&cutoff=09%3A20 | **API docs:** https://backend-beta-two-70.vercel.app/docs | **Demo video:** <FILL: unlisted YouTube URL>
+**Live app:** https://frontend-five-pearl-71.vercel.app/?tab=home&cutoff=09%3A20 | **API docs:** https://backend-beta-two-70.vercel.app/docs | **Demo video:** https://youtu.be/CS0-w3_if4M
 
 CI runs lint, tests and the frontend build on every push.
 
