@@ -78,7 +78,7 @@ export default function App() {
     const p = new URLSearchParams()
     p.set('tab', tab)
     p.set('cutoff', cutoff)
-    p.set('date', date)
+    if (tab === 'forecast') p.set('date', date)
     window.history.replaceState(null, '', `${window.location.pathname}?${p.toString()}`)
   }, [tab, cutoff, date])
 
