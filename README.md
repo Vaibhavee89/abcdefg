@@ -1,0 +1,122 @@
+# Wind Forecast Desk
+
+A day-ahead wind forecast decision-support tool for a UK energy utility's power buying team. It does two things: (1) shows the wind generation forecast that was actually available at the moment a buyer would have committed to a decision, and (2) quantifies how accurate that forecast turned out to be, so a buyer can size a safety buffer instead of guessing one.
+
+Data: Elexon BMRS only (FUELHH actuals, fuelType WIND; WINDFOR forecasts), Great Britain national level. Pre-fetched into `data/*.parquet`, covering 24 Dec 2025 to 3 Feb 2026 — padded on both sides of January so no forecast or actual near the month's edges is missing.
+
+**Live app:** <FILL: frontend URL> | **API docs:** <FILL: backend URL>/docs | **Demo video:** <FILL: unlisted YouTube URL>
+
+![App screenshot](docs/screenshot.png)
+
+## Repo structure
+
+```
+backend/
+  app/
+    fetch_data.py       pulls FUELHH + WINDFOR from the Elexon BMRS API into data/*.parquet
+    selection.py         decision-time forecast selection and hourly alignment
+    metrics.py            bias, MAE, RMSE, percentiles, by hour / day / lead time
+    main.py                   FastAPI app and endpoints
+    api/index.py              Vercel serverless entrypoint (re-exports the FastAPI app)
+    diagnose.py, diagnose2.py, exploration.py, fetch_data2.py   exploratory scripts used while investigating the forecast bias; not part of the app
+  data/                        parquet files bundled for the Vercel deployment
+  tests/                       pytest suite (selection logic + API)
+  Dockerfile, vercel.json, requirements.txt
+data/                          parquet files used for local/Docker runs (same content as backend/data/)
+frontend/
+  src/
+    pages/
+      Landing.jsx                overview, live backtest summary, buffer-sizing calculator
+      Forecast.jsx                decision-time forecast vs. actual for one delivery day
+      Accuracy.jsx                aggregate accuracy metrics across January 2026
+    components/                InfoTip, HowToRead, Skeleton/RetryBanner
+    api.js, useApi.js          fetch helper and a stale-while-revalidate data hook
+    format.js, glossary.js, csv.js
+    App.jsx, App.css           app shell, routing-by-tab, design tokens
+  Dockerfile, nginx.conf, vite.config.js
+docker-compose.yml              runs backend + frontend together locally
+```
+
+## Run locally
+
+With Docker:
+```
+docker compose up --build
+```
+UI at http://localhost:3000, API docs at http://localhost:8000/docs.
+
+Without Docker:
+```
+cd backend && pip install -r requirements.txt && uvicorn app.main:app --reload
+cd frontend && npm install && npm run dev
+```
+The Vite dev server proxies `/api` to port 8000.
+
+Run tests:
+```
+cd backend && pytest
+```
+
+Refresh the underlying data (optional, hits the live Elexon API):
+```
+python backend/app/fetch_data.py
+```
+
+## How it works
+
+1. **Fetch** — `backend/app/fetch_data.py` pulls both datasets from the Elexon BMRS API in 3-day chunks.
+2. **Align** — WINDFOR forecasts are hourly; FUELHH actuals are half-hourly, so actuals are averaged to the hour (left as missing if either half-hour is missing).
+3. **Select** — for each delivery hour, the forecast used is the one with the latest `publishTime <= cutoff` on D-1. This avoids look-ahead bias: no forecast published after the decision time is ever used.
+4. **Metrics** — error = forecast − actual (positive means the forecast was too high, i.e. shortfall risk). Bias, MAE, RMSE, and the P05/P50/P90/P95 error percentiles, computed overall and broken down by hour of day, by day, and by forecast lead time (6-hour buckets, using every forecast run, lead time restricted to positive horizons only).
+
+## Key assumptions
+
+- Decision cutoff is 09:00 UTC on D-1, and is configurable in the UI. GB local time equals UTC in January, so no timezone conversion is needed. The real day-ahead gate closure time should be verified independently; 09:30 was also tested as a sensitivity check.
+- Decision dates run 1–31 Jan 2026, so delivery dates run 2 Jan – 1 Feb 2026.
+- All times are UTC, all generation values are MW.
+- The lead-time breakdown hides buckets with fewer than 1,000 samples, since those are too small to read reliably.
+
+## Key findings (January 2026, 09:00 UTC cutoff, n = 744 hourly slots)
+
+- Bias: +1,748 MW (+15.5% of mean actual wind). MAE: 2,039 MW (18.1%). RMSE: 2,505 MW.
+- The error is asymmetric: P95 over-forecast is +5,283 MW and P90 is +4,098 MW, while P05 is only −1,151 MW. The expensive misses are concentrated in the direction where actual wind came in well below forecast.
+- Bias is positive in every hour of the day (largest overnight, around 2.3 GW at 02:00–06:00 UTC) and on 87% of days. It also grows with the forecast level — roughly +0.4 GW in the lowest-wind quintile versus roughly +3.5 GW in the highest. Even the near-real-time forecast (latest run before the delivery hour) carries about +1.5 GW of bias, so most of the effect is not simply a lead-time/decay artifact.
+- Error spread (P95, RMSE) increases with forecast lead time, as expected.
+- The result is not very sensitive to the exact cutoff: moving it from 09:00 to 09:30 changes MAE by about 1% (2,039 → 2,013 MW).
+- The cause of the persistent over-forecast is not confirmed. Plausible explanations — for example curtailment, or a scope difference between what WINDFOR forecasts and what FUELHH meters — were not tested against additional data. The bias is reported as observed and is not silently corrected anywhere in the app.
+
+## API endpoints
+
+| Endpoint | Query params | Returns |
+|---|---|---|
+| `/api/health` | — | liveness check |
+| `/api/meta` | — | dataset date range, default cutoff |
+| `/api/forecast` | `decision_date`, `cutoff` | hourly forecast/actual/error for one delivery day |
+| `/api/metrics/summary` | `cutoff` | bias, MAE, RMSE, percentiles over the full sample |
+| `/api/metrics/by-hour` | `cutoff` | the above, broken down by hour of day |
+| `/api/metrics/by-day` | `cutoff` | the above, broken down by decision date |
+| `/api/metrics/by-horizon` | — | accuracy vs. forecast lead time (6h buckets) |
+| `/api/metrics/histogram` | `cutoff`, `bins` | error distribution histogram |
+
+## Design decisions and trade-offs
+
+- Data is pre-fetched into parquet and cached in memory at startup rather than queried from Elexon per request — this keeps the API reliable and fast on a serverless deployment, at the cost of needing a manual refresh to pick up new data.
+- Selection and metrics logic are pure functions, independent of the API layer, so they're directly unit-testable without spinning up a server.
+- The decision cutoff is a parameter throughout, not a hardcoded constant, so the sensitivity check (09:00 vs. 09:30) required no code changes.
+- The "cautious plan" line shown on the forecast chart subtracts the full-January P90 from the forecast. It illustrates the size of a sensible buffer; it is not a back-tested trading rule and should not be read as one.
+
+## Testing
+
+The test suite covers:
+- Selection edge cases: a forecast published after the cutoff is excluded; one published exactly at the cutoff is included; when multiple eligible forecasts exist, the most recently published one wins.
+- API behavior: the forecast endpoint returns the expected row count for a full day, and invalid inputs (out-of-range dates, malformed cutoffs) are rejected with a validation error.
+
+## Possible next steps
+
+- A bias-corrected forecast view that only uses a trailing window of past errors available at decision time, to avoid look-ahead leakage.
+- Incorporate demand data to compute net purchase need rather than wind output in isolation.
+- Investigate the cause of the persistent bias using additional datasets (e.g. embedded generation estimates, curtailment instructions).
+
+## AI usage
+
+This project was built with AI assistance (Claude) for planning, code generation, debugging, and review. I reviewed and tested the code myself, and the analysis choices and assumptions described above are my own responsibility.
