@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import metrics
 from .selection import (build_dataset, prep_actuals_hourly, prep_forecasts,
-                        select_for_decision)
+                        select_for_decision, validate_full_coverage)
 
 _LOCAL_DATA = Path(__file__).resolve().parents[2] / "data"
 _BUNDLED_DATA = Path(__file__).resolve().parents[1] / "data"
@@ -19,6 +19,7 @@ A = prep_actuals_hourly(pd.read_parquet(DATA / "actuals_raw.parquet"))
 
 FIRST, LAST = pd.Timestamp("2026-01-01"), pd.Timestamp("2026-01-31")
 CUTOFF_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+DEFAULT_CUTOFF = "09:20"
 
 app = FastAPI(title="Wind Forecast Accuracy API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -33,6 +34,11 @@ def check_cutoff(cutoff: str) -> str:
 @lru_cache(maxsize=64)
 def dataset(cutoff: str) -> pd.DataFrame:
     return build_dataset(F, A, cutoff=cutoff)
+
+
+# Fail loudly at startup if the data pipeline produced an incomplete dataset,
+# rather than silently serving partial results from a broken deploy.
+validate_full_coverage(dataset(DEFAULT_CUTOFF))
 
 
 def records(df: pd.DataFrame) -> list:
@@ -51,11 +57,11 @@ def health():
 @app.get("/api/meta")
 def meta():
     return {"first_decision_date": "2026-01-01", "last_decision_date": "2026-01-31",
-            "default_cutoff": "09:20", "timezone": "UTC"}
+            "default_cutoff": DEFAULT_CUTOFF, "timezone": "UTC"}
 
 
 @app.get("/api/forecast")
-def forecast(decision_date: str = Query("2026-01-14"), cutoff: str = "09:20"):
+def forecast(decision_date: str = Query("2026-01-14"), cutoff: str = DEFAULT_CUTOFF):
     """Forecast available at `cutoff` on decision_date, for delivery the next day."""
     check_cutoff(cutoff)
     try:
@@ -70,19 +76,19 @@ def forecast(decision_date: str = Query("2026-01-14"), cutoff: str = "09:20"):
 
 
 @app.get("/api/metrics/summary")
-def summary(cutoff: str = "09:20"):
+def summary(cutoff: str = DEFAULT_CUTOFF):
     check_cutoff(cutoff)
     s = metrics.summary(dataset(cutoff))
     return {k: (None if pd.isna(v) else float(v)) for k, v in s.items()}
 
 
 @app.get("/api/metrics/by-hour")
-def by_hour(cutoff: str = "09:20"):
+def by_hour(cutoff: str = DEFAULT_CUTOFF):
     return records(metrics.by_hour(dataset(check_cutoff(cutoff))))
 
 
 @app.get("/api/metrics/by-day")
-def by_day(cutoff: str = "09:20"):
+def by_day(cutoff: str = DEFAULT_CUTOFF):
     return records(metrics.by_day(dataset(check_cutoff(cutoff))))
 
 
@@ -92,5 +98,5 @@ def by_horizon():
 
 
 @app.get("/api/metrics/histogram")
-def histogram(cutoff: str = "09:20", bins: int = Query(30, ge=5, le=100)):
+def histogram(cutoff: str = DEFAULT_CUTOFF, bins: int = Query(30, ge=5, le=100)):
     return metrics.error_histogram(dataset(check_cutoff(cutoff)), bins=bins)

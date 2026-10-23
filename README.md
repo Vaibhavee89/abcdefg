@@ -115,7 +115,11 @@ python backend/app/fetch_data.py
 ## Testing
 
 The test suite covers:
-- Selection edge cases: a forecast published after the cutoff is excluded; one published exactly at the cutoff is included; when multiple eligible forecasts exist, the most recently published one wins.
+- Selection edge cases: a forecast published after the cutoff is excluded; one published exactly at the cutoff is included; when multiple eligible forecasts exist, the most recently published one wins; a slot with no eligible forecast is simply absent, not silently filled.
+- A look-ahead regression guard: a forecast published after the cutoff must never appear in the selected dataset.
+- Data quality: duplicate `(startTime, publishTime)` forecast rows are deduplicated; an hour with only one of its two half-hourly actuals present comes out as missing (NaN), not a partial average.
+- Metrics: bias, MAE and RMSE on a small hand-computed DataFrame are checked against numbers worked out by hand, and a row with a missing actual is confirmed to be excluded from the metrics rather than silently zero-filled.
+- `validate_full_coverage()`, a startup check that raises loudly if January isn't fully covered (wrong row count, or any missing forecast/actual) — this runs automatically whenever the API process starts, not just in tests.
 - API behavior: the forecast endpoint returns the expected row count for a full day, and invalid inputs (out-of-range dates, malformed cutoffs) are rejected with a validation error.
 
 ## Possible next steps
