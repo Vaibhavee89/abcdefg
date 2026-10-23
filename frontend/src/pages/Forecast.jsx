@@ -255,7 +255,7 @@ export default function Forecast({ cutoff, date, setDate, meta }) {
       )}
 
       <footer className="desk-footer">
-        <span>Data sources: Elexon BMRS (FUELHH actuals &amp; WINDFOR forecasts). All decision timestamps in UTC. Cutoff assumption: {cutoff} UTC. Built with AI assistance.</span>
+        <span>Data sources: Elexon BMRS (FUELHH actuals &amp; WINDFOR forecasts). All decision timestamps in UTC. Cutoff assumption: {cutoff} UTC.</span>
         <nav><span>Data Methodology</span><span>BMRS Feed</span><span>Settlement API</span></nav>
       </footer>
     </section>
