@@ -1,6 +1,10 @@
 import hashlib
+import json
+import logging
 import os
 import re
+import time
+import uuid
 from functools import lru_cache
 from pathlib import Path
 from typing import List, Optional
@@ -53,6 +57,32 @@ app = FastAPI(title="Wind Forecast Accuracy API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 API = "/api/v1"
+
+
+# -------------------------------------------------------------- logging ---
+
+log = logging.getLogger("api")
+log.setLevel(logging.INFO)
+if not log.handlers:
+    # explicit handler so these lines show up under uvicorn/Docker/Vercel
+    # regardless of how (or whether) the host app has configured logging
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(message)s"))
+    log.addHandler(_handler)
+    log.propagate = False
+
+
+@app.middleware("http")
+async def timing(request: Request, call_next):
+    rid, t = uuid.uuid4().hex[:8], time.perf_counter()
+    resp = await call_next(request)
+    ms = round((time.perf_counter() - t) * 1000, 1)
+    log.info(json.dumps({
+        "rid": rid, "method": request.method, "path": request.url.path,
+        "status": resp.status_code, "ms": ms,
+    }))
+    resp.headers["X-Request-ID"] = rid
+    return resp
 
 
 # ---------------------------------------------------------------- errors ---

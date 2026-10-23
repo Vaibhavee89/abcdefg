@@ -61,3 +61,8 @@ def test_by_day_and_by_hour_match_their_response_models():
     by_horizon = c.get("/api/v1/metrics/by-horizon")
     assert by_horizon.status_code == 200
     assert len(by_horizon.json()) > 0
+
+def test_every_response_carries_a_request_id():
+    for r in [c.get("/api/v1/health"), c.get("/api/v1/metrics/summary", params={"cutoff": "9am"})]:
+        rid = r.headers.get("x-request-id")
+        assert rid and len(rid) == 8

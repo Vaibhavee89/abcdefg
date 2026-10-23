@@ -112,6 +112,8 @@ All routes are versioned under `/api/v1`. Every response (success and error) has
 | `/api/v1/metrics/by-horizon` | — | accuracy vs. forecast lead time (6h buckets) |
 | `/api/v1/metrics/histogram` | `cutoff`, `bins` | error distribution histogram |
 
+Every request is logged as one JSON line (`rid`, `method`, `path`, `status`, `ms`) and gets a matching `X-Request-ID` response header, so a slow or failing request in production logs can be traced back to the exact client-visible response.
+
 ## Design decisions and trade-offs
 
 See [docs/decisions.md](docs/decisions.md) for the longer rationale behind the choices below.
