@@ -17,6 +17,15 @@ function readUrlState() {
   return { tab, cutoff, date }
 }
 
+function readStoredTheme() {
+  try {
+    const t = localStorage.getItem('theme')
+    return t === 'dark' || t === 'light' ? t : 'light'
+  } catch {
+    return 'light'
+  }
+}
+
 function useUtcClock() {
   const [t, setT] = useState(() => new Date())
   useEffect(() => {
@@ -32,11 +41,12 @@ export default function App() {
   const [cutoff, setCutoff] = useState(init.cutoff)
   const [date, setDate] = useState(init.date)
   const [advancedCutoff, setAdvancedCutoff] = useState(!PRESET_CUTOFFS.includes(init.cutoff))
-  const [theme, setTheme] = useState('light')
+  const [theme, setTheme] = useState(readStoredTheme)
   const clock = useUtcClock()
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
+    try { localStorage.setItem('theme', theme) } catch { /* ignore */ }
   }, [theme])
 
   useEffect(() => {
