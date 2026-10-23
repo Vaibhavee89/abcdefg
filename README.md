@@ -76,6 +76,13 @@ python backend/app/fetch_data.py
 - All times are UTC, all generation values are MW.
 - The lead-time breakdown hides buckets with fewer than 1,000 samples, since those are too small to read reliably.
 
+## Assumptions and open questions
+
+- **Cutoff:** 09:20 UTC is used as the EPEX GB gate closure and is the app's default. This is an assumption about the real auction time, not something verified against an official Elexon/EPEX schedule document — treat it as "best available estimate," not fact.
+- **Hourly alignment:** WINDFOR is hourly and FUELHH is half-hourly, so actuals are averaged to the hour. An open question is whether this averaging itself introduces any small bias versus comparing WINDFOR to a true hourly-metered series, if one existed.
+- **"Decision made in January" means decision date 1–31 Jan 2026**, i.e. delivery dates 2 Jan – 1 Feb 2026. It does not mean "forecasts published in January" — some underlying forecast runs used were published in late December.
+- **The bias is unexplained.** The forecast runs persistently and substantially above metered actuals (+15.5% on average), and this is reported as an observed fact, not a diagnosed one. Curtailment and a scope mismatch between WINDFOR (which may include embedded generation) and FUELHH (metered only) are both plausible, untested explanations. No bias correction is applied anywhere in the app.
+
 ## Key findings (January 2026, 09:20 UTC cutoff, n = 744 hourly slots)
 
 - Bias: +1,748 MW (+15.5% of mean actual wind). MAE: 2,039 MW (18.1%). RMSE: 2,505 MW.
