@@ -1,1 +1,1 @@
-from app.main import app  # Vercel serves the ASGI `app`
+from app.main import app  # noqa: F401 — Vercel serves this ASGI `app`; it's a re-export, not dead code

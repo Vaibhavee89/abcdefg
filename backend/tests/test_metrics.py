@@ -1,5 +1,7 @@
 import pandas as pd
+
 from app.metrics import summary
+
 
 def mk_df(rows):
     df = pd.DataFrame(rows, columns=["startTime", "forecast", "actual"])

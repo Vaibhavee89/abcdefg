@@ -1,7 +1,13 @@
 import pandas as pd
 import pytest
-from app.selection import (prep_actuals_hourly, prep_forecasts,
-                            select_for_decision, validate_full_coverage)
+
+from app.selection import (
+    prep_actuals_hourly,
+    prep_forecasts,
+    select_for_decision,
+    validate_full_coverage,
+)
+
 
 def mk(rows):
     return pd.DataFrame(rows, columns=["startTime", "publishTime", "forecast"]).assign(

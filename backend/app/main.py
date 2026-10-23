@@ -8,8 +8,13 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import metrics
-from .selection import (build_dataset, prep_actuals_hourly, prep_forecasts,
-                        select_for_decision, validate_full_coverage)
+from .selection import (
+    build_dataset,
+    prep_actuals_hourly,
+    prep_forecasts,
+    select_for_decision,
+    validate_full_coverage,
+)
 
 _LOCAL_DATA = Path(__file__).resolve().parents[2] / "data"
 _BUNDLED_DATA = Path(__file__).resolve().parents[1] / "data"

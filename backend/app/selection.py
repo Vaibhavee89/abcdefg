@@ -1,5 +1,6 @@
 import pandas as pd
 
+
 def _utc(s):
     return pd.to_datetime(s, utc=True)
 

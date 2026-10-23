@@ -6,6 +6,8 @@ Data: Elexon BMRS only (FUELHH actuals, fuelType WIND; WINDFOR forecasts), Great
 
 **Live app:** <FILL: frontend URL> | **API docs:** <FILL: backend URL>/docs | **Demo video:** <FILL: unlisted YouTube URL>
 
+CI runs lint, tests and the frontend build on every push.
+
 ![App screenshot](docs/screenshot.png)
 
 ## Repo structure
@@ -20,9 +22,13 @@ backend/
     api/index.py              Vercel serverless entrypoint (re-exports the FastAPI app)
     diagnose.py, diagnose2.py, exploration.py, fetch_data2.py   exploratory scripts used while investigating the forecast bias; not part of the app
   data/                        parquet files bundled for the Vercel deployment
-  tests/                       pytest suite (selection logic + API)
-  Dockerfile, vercel.json, requirements.txt
+  tests/                       pytest suite (selection logic, metrics, API)
+  Dockerfile, vercel.json, requirements.txt, pyproject.toml (ruff config)
 data/                          parquet files used for local/Docker runs (same content as backend/data/)
+.github/workflows/ci.yml        lint + test + build on every push/PR
+docs/decisions.md               longer rationale behind the design decisions below
+.env.example                    the few optional env vars, and when you'd need them
+Makefile                        make install / dev / test / up
 frontend/
   src/
     pages/
@@ -41,7 +47,7 @@ docker-compose.yml              runs backend + frontend together locally
 
 With Docker:
 ```
-docker compose up --build
+docker compose up --build   # or: make up
 ```
 UI at http://localhost:3000, API docs at http://localhost:8000/docs.
 
@@ -50,17 +56,16 @@ Without Docker:
 cd backend && pip install -r requirements.txt && uvicorn app.main:app --reload
 cd frontend && npm install && npm run dev
 ```
-The Vite dev server proxies `/api` to port 8000.
+Or `make install && make dev` to do both from the repo root (Ctrl+C stops both servers). The Vite dev server proxies `/api` to port 8000.
 
-Run tests:
-```
-cd backend && pytest
-```
+Run tests: `cd backend && pytest` or `make test`.
 
 Refresh the underlying data (optional, hits the live Elexon API):
 ```
 python backend/app/fetch_data.py
 ```
+
+No environment variables are required for local development — see [.env.example](.env.example) for the optional ones (`VITE_API_URL`, `DATA_DIR`, `PORT`) and when you'd need them.
 
 ## How it works
 
@@ -106,6 +111,8 @@ python backend/app/fetch_data.py
 | `/api/metrics/histogram` | `cutoff`, `bins` | error distribution histogram |
 
 ## Design decisions and trade-offs
+
+See [docs/decisions.md](docs/decisions.md) for the longer rationale behind the choices below.
 
 - Data is pre-fetched into parquet and cached in memory at startup rather than queried from Elexon per request — this keeps the API reliable and fast on a serverless deployment, at the cost of needing a manual refresh to pick up new data.
 - Selection and metrics logic are pure functions, independent of the API layer, so they're directly unit-testable without spinning up a server.
