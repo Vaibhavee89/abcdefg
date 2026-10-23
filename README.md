@@ -23,7 +23,7 @@ backend/
     diagnose.py, diagnose2.py, exploration.py, fetch_data2.py   exploratory scripts used while investigating the forecast bias; not part of the app
   data/                        parquet files bundled for the Vercel deployment
   tests/                       pytest suite (selection logic, metrics, API)
-  Dockerfile, vercel.json, requirements.txt, pyproject.toml (ruff config)
+  Dockerfile, vercel.json, requirements.txt, ruff.toml, pytest.ini
 data/                          parquet files used for local/Docker runs (same content as backend/data/)
 .github/workflows/ci.yml        lint + test + build on every push/PR
 docs/decisions.md               longer rationale behind the design decisions below
